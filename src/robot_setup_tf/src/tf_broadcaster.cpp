@@ -37,12 +37,6 @@ tf::Transform getTransform(Joint joint, double angle) {
 double* invKinematics(double desiredX, double desiredY, double desiredZ) {
     double* thetas = new double[3];
 
-    // thetas[0] = atan2(desiredY, desiredX) - (M_PI / 2);
-    // thetas[2] = acos((pow(desiredZ, 2) + pow(desiredY, 2) + pow(desiredX, 2) - 0.32) / 0.32);
-    // thetas[1] = atan2(desiredX, desiredZ) - atan2(0.4 * sin(thetas[2]), 0.4 + 0.4 * cos(thetas[2]));
-
-
-
     thetas[0] = atan2(desiredY, desiredX) + PI / 2;
     double r = sqrt(pow(desiredY, 2) + pow(desiredX, 2));
     double d = sqrt(pow(desiredZ - 0.07, 2) + pow(r, 2));
@@ -51,22 +45,18 @@ double* invKinematics(double desiredX, double desiredY, double desiredZ) {
 
     std::cout << thetas[0] << " " << thetas[1] << " " << thetas[2] << '\n';
 
-    //thetas[0] = atan2(desiredY, desiredX);
-
     return thetas;
 }
 
-void moveArmToPos(double x, double y, double z) {
-    std::cout << "Move Arm to : x = " << x << ", y = " << y << ", z = " << z << "\n";
-    double* thetas = invKinematics(x, y, z);
-
-    tf::Transform transform1 = getTransform(toe, thetas[0]);
-    tf::Transform transform2 = getTransform(foot, thetas[1]);
-    tf::Transform transform3 = getTransform(leg, thetas[2]);
+void moveArmToPos(double theta1, double theta2, double theta3) {
+    tf::Transform transform1 = getTransform(toe, theta1);
+    tf::Transform transform2 = getTransform(foot, theta2);
+    tf::Transform transform3 = getTransform(leg, theta3);
 
     tf::Transform transform4;
     transform4.setOrigin( tf::Vector3(0.0, 0.0, 0.4));
     transform4.setRotation( tf::createQuaternionFromRPY(0, 0, 0));
+
 
     static tf::TransformBroadcaster broadcaster;
 
@@ -92,6 +82,20 @@ void moveArmToPos(double x, double y, double z) {
 
 }
 
+void moveArm(double x, double y, double z) {
+    double* thetas = invKinematics(x, y, z);
+
+    std::cout << "Move Arm to : x = " << x << ", y = " << y << ", z = " << z << "\n";
+
+    for (int i = 1; i <= 20; i++) {
+        double dth1 = (thetas[0] / 20) * i;
+        double dth2 = (thetas[1] / 20) * i;
+        double dth3 = (thetas[2] / 20) * i;
+
+        moveArmToPos(dth1, dth2, dth3);
+    }
+}
+
 void moveBall(double x, double y, double z) {
     std::cout << "Move Ball to : x = " << x << ", y = " << y << ", z = " << z << "\n";
     static tf::TransformBroadcaster broadcaster_ball;
@@ -107,14 +111,14 @@ void moveBall(double x, double y, double z) {
 }
 
 void initArm() {
-    moveArmToPos(-0.05, 0, 0.5);
+    moveArm(-0.05, 0, 0.5);
 }
 
 void chatterCallback(const geometry_msgs::Vector3::ConstPtr& msg) {
     moveBall(msg->x, msg->y, msg->z);
 
     if (msg->x >= -0.4)
-        moveArmToPos(msg->x, msg->y, msg->z);
+        moveArm(msg->x, msg->y, msg->z);
     else
         initArm();
 }
